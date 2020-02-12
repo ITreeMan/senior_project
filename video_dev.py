@@ -17,6 +17,26 @@ from utils.data_aug import letterbox_resize
 
 from model import yolov3
 
+
+
+import microgear.client as netpie
+import base64, zlib, time
+import random
+import datetime
+
+
+
+# appid = "ITreeMan"
+# gearkey = "wNxopmb6H6ERMNa"
+# gearsecret =  "NvyOuDrdRNr2gLcyS8fuHS2X2"
+
+app = "ITreeMan"
+key = "wNxopmb6H6ERMNa"
+secret = "NvyOuDrdRNr2gLcyS8fuHS2X2"
+
+
+
+
 parser = argparse.ArgumentParser(description="YOLO-V3 video test procedure.")
 parser.add_argument("input_video", type=str,
                     help="The path of the input video.")
@@ -42,18 +62,39 @@ args.num_class = len(args.classes)
 
 color_table = get_color_table(args.num_class)
 
-vid = cv2.VideoCapture(args.input_video)
-video_frame_cnt = int(vid.get(7))
-video_width = int(vid.get(3))
-video_height = int(vid.get(4))
-video_fps = int(vid.get(3))
+vid = cv2.VideoCapture('rtsp://admin:A1234567890a@169.254.41.60:554/live.sdp')
 
-if args.save_video:
-    fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
-    videoWriter = cv2.VideoWriter(
-        'video_result.mp4', fourcc, video_fps, (video_width, video_height))
+# video_frame_cnt = int(vid.get(7))
+# video_width = int(vid.get(3))
+# video_height = int(vid.get(4))
+# video_fps = int(vid.get(3))
+
+
+
+# if args.save_video:
+#     fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
+#     videoWriter = cv2.VideoWriter(
+#         'video_result.mp4', fourcc, video_fps, (video_width, video_height))
 
 with tf.Session() as sess:
+
+
+    netpie.create(key,secret,app,{'debugmode': True})
+
+    def connection():
+	    print ("Now I am connected with netpie")
+
+    def subscription(topic,message):
+	    print (topic+" "+message)
+
+    netpie.setname("trafficLigt")
+    netpie.on_connect = connection
+    netpie.on_message = subscription
+    netpie.subscribe("/mails")
+
+    netpie.connect()
+
+
     input_data = tf.placeholder(
         tf.float32, [1, args.new_size[1], args.new_size[0], 3], name='input_data')
     yolo_model = yolov3(args.num_class, args.anchors)
@@ -69,9 +110,13 @@ with tf.Session() as sess:
     saver = tf.train.Saver()
     saver.restore(sess, args.restore_path)
 
-
+    test = 0
 # video show
-    for i in range(video_frame_cnt):
+    while True:
+
+    
+
+
         countCar = 0
         ret, img_ori = vid.read()
         if args.letterbox_resize:
@@ -104,14 +149,36 @@ with tf.Session() as sess:
                 countCar += 1
         
 
+
+        # trafficLigt_message = countCar
+        # print(">>>"+trafficLigt_message)
+
+
+        red = 1
+        yellow = 2
+        green = 3
+
+        test += 1
         end_time = time.time()
         print((time.time() - start_time))
         print(countCar)
+        modCountCar = countCar%3
+        if modCountCar == 0 :
+            netpie.chat("trafficLigt",green)
+        elif modCountCar == 1:
+            netpie.chat("trafficLigt",yellow)
+        elif modCountCar == 2:
+            netpie.chat("trafficLigt",red)
+        # if test == 3:
+        #     netpie.chat("trafficLigt","OFF")
+        #     test=0
         # cv2.putText(img_ori, 'Vehicle: {:.0f} '.format(
         #     countCar), (40, 40), 0, fontScale=1, color=(0, 255, 0), thickness=2)
         
         cv2.putText(img_ori, '{:.2f}ms'.format((end_time - start_time) * 1000)+"  "+'Vehicle: {:.0f} '.format(countCar), (40, 40), 0,
                     fontScale=1, color=(0, 255, 0), thickness=2)
+
+
 
         cv2.imshow('image', img_ori)
         if args.save_video:
@@ -119,6 +186,14 @@ with tf.Session() as sess:
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
+
+
+				
+
+
     vid.release()
     if args.save_video:
         videoWriter.release()
+
+
+
